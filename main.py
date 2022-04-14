@@ -1,9 +1,11 @@
 import yfinance as yf
-import threading
-
+import pandas as pd
+import time
 
 def analysis(stock):
     print(stock)
+    data = yf.download(tickers=stock, period='6mo', interval='1d')
+    print(data.tail(3))
 
 stocks_list = ['A2A.MI', 'AMP.MI', 'ATL.MI', 'ATL.MI', 'BGN.MI',
     'BMED.MI', 'BAMI.MI', 'BPE.MI', 'CPR.MI', 'CNHI.MI', 
@@ -19,11 +21,5 @@ thread_list = []
 if __name__ == '__main__':
     print('Ciao')
     for stock in stocks_list:
-        t = threading.Thread(target=analysis, args=(stock, ))
-        thread_list.append(t)
-
-    for thread in thread_list:
-        thread.start()
-
-    for thread in thread_list:
-        thread.join()
+        analysis(stock=stock)
+       
