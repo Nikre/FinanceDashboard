@@ -1,9 +1,8 @@
-from operator import length_hint
-from numpy import append
+from cmath import nan
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import pandas_ta as ta
-import time
 import json
 
 def analysis(stock):
@@ -14,9 +13,71 @@ def analysis(stock):
 def back_testing(stock):
     data = yf.download(tickers=stock, period='5y', interval='1d')
     data = add_indicators(data)
+    open_trade = False
+    exit_condition = False
+
+    entry_price = None
+    entry_date = None
+    close_price = None
+    close_date = None
+
+    exspire_trade = 10
+
     for index, row in data.iterrows():
-        print(index)
-        time.sleep(0.1)
+        if (not np.isnan(row['SMA200'])):
+            if (not open_trade) and (row['Close'] < row['BBL20']):
+                entry_price = row['Close'] * 0.97
+            elif (entry_price) and (not open_trade) and (row['Low'] <= entry_price and entry_price <= row['High']):
+                open_trade = True
+                entry_date = index
+            elif (open_trade) and (exspire_trade > 0):
+                if (row['RSI_14'] >= 50):
+                    exspire_trade = 10
+                    exit_condition = True
+                else:
+                    exspire_trade = exspire_trade - 1
+                
+                if exspire_trade == 0: # ordine scaduto
+                    exspire_trade = 10
+                    
+                    close_date = index
+                    close_price = row['Open']
+                    
+                    back_testing_opearions['operations'].append({'titolo': stock,
+                                                                'data_entrata': entry_date.strftime("%d/%m/%Y"),
+                                                                'prezzo_entrata': entry_price,
+                                                                'data_chiusura': close_date.strftime("%d/%m/%Y"),
+                                                                'prezzo_chiusura': close_price,
+                                                                'profitto': (close_price - entry_price)})
+
+                    open_trade = False
+                    exit_condition = False
+
+                    entry_price = None
+                    entry_date = None
+                    close_price = None
+                    close_date = None
+
+
+            elif (exit_condition and open_trade):
+                close_date = index
+                close_price = row['Open']
+                
+                back_testing_opearions['operations'].append({'titolo': stock,
+                                                            'data_entrata': entry_date.strftime("%d/%m/%Y"),
+                                                            'prezzo_entrata': entry_price,
+                                                            'data_chiusura': close_date.strftime("%d/%m/%Y"),
+                                                            'prezzo_chiusura': close_price,
+                                                            'profitto': (close_price - entry_price)})
+
+                open_trade = False
+                exit_condition = False
+
+                entry_price = None
+                entry_date = None
+                close_price = None
+                close_date = None
+                
 
 def add_indicators(data):
     data['SMA20'] = data['Close'].rolling(20).mean()
@@ -47,10 +108,13 @@ possible_entry = {'operations': []}
 back_testing_opearions = {'operations': []}
 
 if __name__ == '__main__':
-    print('Ciao')
     for stock in stocks_list:
+        print(stock)
         # analysis(stock=stock)
         back_testing(stock=stock)
         
-    with open('data.json', 'w') as fp:
+    with open('possible_entry.json', 'w') as fp:
         json.dump(possible_entry, fp)
+    
+    with open('back_testing_opearions.json', 'w') as fp:
+        json.dump(back_testing_opearions, fp)
